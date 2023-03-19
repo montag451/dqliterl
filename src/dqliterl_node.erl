@@ -236,7 +236,7 @@ call(NodeRef, Req) when is_integer(NodeRef) ->
     {ok, port()} | {error, term()}.
 spawn_node(Id, Addr, Dir, Opts) ->
     Opts2 = [{id, Id}, {addr, Addr}, {dir, Dir} | Opts],
-    NodeBin = filename:join([code:priv_dir(dqliterl), "bin", "dqliterl_node_debug.sh"]),
+    NodeBin = filename:join([code:priv_dir(dqliterl), "bin", "dqliterl_node"]),
     Port = open_port(
         {spawn_executable, NodeBin}, [{packet, 4}, binary, exit_status]
     ),

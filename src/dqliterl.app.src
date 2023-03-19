@@ -1,0 +1,27 @@
+{application, dqliterl, [
+    {description, "An Erlang client for Dqlite"},
+    {vsn, "0.1.0"},
+    {registered, [
+        dqliterl_node_instance_sup,
+        dqliterl_node_registry,
+        dqliterl_node_sup,
+        dqliterl_sup
+    ]},
+    {mod, {dqliterl_app, []}},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, [
+        dqliterl_app,
+        dqliterl_node,
+        dqliterl_node_instance_sup,
+        dqliterl_node_registry,
+        dqliterl_node_sup,
+        dqliterl_proto,
+        dqliterl_sup
+    ]},
+    {licenses, ["MIT"]},
+    {links, []}
+]}.

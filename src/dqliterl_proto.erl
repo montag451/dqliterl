@@ -2,6 +2,8 @@
 
 -dialyzer(no_improper_lists).
 
+-include("dqliterl.hrl").
+
 -export([
     encode_req/1,
     decode_resp/1
@@ -10,19 +12,41 @@
 -export_type([
     node_id/0,
     node_role/0,
-    node_info/0
+    node_info0/0,
+    node_info/0,
+    file/0,
+    sql_value/0
 ]).
 
--include("dqliterl.hrl").
+-type node_id() :: uint64().
+-type node_role() :: voter | standby | spare.
+-type node_info0() :: #node_info0{}.
+-type node_info() :: #node_info{}.
+-type file() :: #file{}.
+
+-type sql_type() ::
+    int64
+    | float
+    | text
+    | blob
+    | null
+    | unixtime
+    | iso8601
+    | bool.
+-type sql_value() ::
+    {int64, int64()}
+    | {float, float()}
+    | {text, unicode:chardata()}
+    | {blob, binary()}
+    | null
+    | {unixtime, int64()}
+    | {iso8601, unicode:chardata()}
+    | {bool, boolean()}.
 
 -type uint8() :: 0..255.
 -type uint64() :: 0..18446744073709551615.
 -type int64() :: -9223372036854775808..9223372036854775807.
 -type uint32() :: 0..4294967295.
-
--type node_id() :: uint64().
--type node_role() :: voter | standby | spare.
--type node_info() :: #node_info{}.
 
 -type schema_version() :: uint8().
 -type client_id() :: uint64().
@@ -30,15 +54,7 @@
 -type stmt_id() :: uint32().
 -type failure_domain() :: uint64().
 -type weight() :: uint64().
--type param_tuple() :: [param_value()].
--type param_value() ::
-    {int, int64()}
-    | {float, float()}
-    | {text, unicode:chardata()}
-    | {blob, binary()}
-    | null
-    | {date, unicode:chardata()}
-    | {bool, boolean()}.
+-type param_tuple() :: [sql_value()].
 -type req_schema_type() :: uint8().
 -type req() ::
     leader
@@ -51,7 +67,7 @@
     | {exec_sql, database_id(), unicode:chardata(), param_tuple()}
     | {query_sql, database_id(), unicode:chardata(), param_tuple()}
     | {interrupt, database_id()}
-    | {add, #node_info0{}}
+    | {add, node_info0()}
     | {assign, node_id(), node_role()}
     | {remove, node_id()}
     | {dump, unicode:chardata()}
@@ -61,16 +77,19 @@
 -type error_code() :: uint64().
 -type error_message() :: unicode:chardata().
 -type resp_schema_type() :: uint8().
+-type row_tuple() :: [sql_value()].
+-type col_name() :: unicode:chardata().
 -type resp() ::
     {failure, error_code(), error_message()}
-    | {leader, #node_info0{}}
+    | {leader, node_info0()}
     | welcome
-    | {cluster, [#node_info{}]}
+    | {cluster, [node_info()]}
     | {database, database_id()}
     | {stmt, database_id(), stmt_id(), non_neg_integer()}
     | {exec, non_neg_integer(), non_neg_integer()}
+    | {rows, [col_name()], [row_tuple()], more | done}
     | ack
-    | {files, [#file{}]}
+    | {files, [file()]}
     | {metadata, failure_domain(), weight()}.
 
 -spec encode_req(req()) -> iodata().
@@ -142,7 +161,7 @@ encode_param_tuple_header([], N, Header) ->
         end,
     {Schema, [Header2 | padding(iolist_size(Header2))]};
 encode_param_tuple_header([Param | Rest], N, Header) ->
-    encode_param_tuple_header(Rest, N + 1, [Header | encode_param_value_type(Param)]).
+    encode_param_tuple_header(Rest, N + 1, [Header | encode_sql_value_type(Param)]).
 
 -spec encode_param_tuple_values(param_tuple()) -> iodata().
 encode_param_tuple_values(Params) ->
@@ -152,7 +171,7 @@ encode_param_tuple_values(Params) ->
 encode_param_tuple_values([], Acc) ->
     Acc;
 encode_param_tuple_values([Param | Rest], Acc) ->
-    encode_param_tuple_values(Rest, [Acc | encode_param_value(Param)]).
+    encode_param_tuple_values(Rest, [Acc | encode_sql_value(Param)]).
 
 -spec encode_param_tuple_size(uint32()) -> binary().
 encode_param_tuple_size(N) when N > 255 ->
@@ -160,36 +179,40 @@ encode_param_tuple_size(N) when N > 255 ->
 encode_param_tuple_size(N) ->
     <<N>>.
 
--spec encode_param_value_type(param_value()) -> binary().
-encode_param_value_type({int, _}) ->
+-spec encode_sql_value_type(sql_value()) -> binary().
+encode_sql_value_type({int64, _}) ->
     <<1>>;
-encode_param_value_type({float, _}) ->
+encode_sql_value_type({float, _}) ->
     <<2>>;
-encode_param_value_type({text, _}) ->
+encode_sql_value_type({text, _}) ->
     <<3>>;
-encode_param_value_type({blob, _}) ->
+encode_sql_value_type({blob, _}) ->
     <<4>>;
-encode_param_value_type(null) ->
+encode_sql_value_type(null) ->
     <<5>>;
-encode_param_value_type({date, _}) ->
+encode_sql_value_type({unixtime, _}) ->
+    <<9>>;
+encode_sql_value_type({iso8601, _}) ->
     <<10>>;
-encode_param_value_type({bool, _}) ->
+encode_sql_value_type({bool, _}) ->
     <<11>>.
 
--spec encode_param_value(param_value()) -> iodata().
-encode_param_value({int, I}) ->
+-spec encode_sql_value(sql_value()) -> iodata().
+encode_sql_value({int64, I}) ->
     encode({int64, I});
-encode_param_value({float, F}) ->
+encode_sql_value({float, F}) ->
     encode({float, F});
-encode_param_value({text, T}) ->
+encode_sql_value({text, T}) ->
     encode({text, T});
-encode_param_value({blob, B}) ->
+encode_sql_value({blob, B}) ->
     encode({blob, B});
-encode_param_value(null) ->
+encode_sql_value(null) ->
     encode(null);
-encode_param_value({date, D}) ->
-    encode({date, D});
-encode_param_value({bool, B}) ->
+encode_sql_value({unixtime, D}) ->
+    encode({unixtime, D});
+encode_sql_value({iso8601, D}) ->
+    encode({iso8601, D});
+encode_sql_value({bool, B}) ->
     encode({bool, B}).
 
 -spec encode
@@ -201,9 +224,10 @@ encode_param_value({bool, B}) ->
     ({blob, binary()}) -> iodata();
     ({bool, boolean()}) -> binary();
     (null) -> binary();
-    ({date, unicode:chardata()}) -> binary();
+    ({unixtime, int64()}) -> binary();
+    ({iso8601, unicode:chardata()}) -> iodata();
     ({node_role, node_role()}) -> binary();
-    (#node_info0{}) -> iodata().
+    (node_info0()) -> iodata().
 encode({uint64, N}) ->
     <<N:64/little>>;
 encode({int64, N}) ->
@@ -224,7 +248,9 @@ encode({bool, true}) ->
     encode({uint64, 1});
 encode(null) ->
     encode({uint64, 0});
-encode({date, Date}) ->
+encode({unixtime, Date}) ->
+    encode({int64, Date});
+encode({iso8601, Date}) ->
     encode({text, Date});
 encode({node_role, voter}) ->
     encode({uint64, 0});
@@ -274,6 +300,11 @@ decode_resp(6, _Schema, Body) ->
     {RowId, Rest} = decode(uint64, Body),
     {N, <<>>} = decode(uint64, Rest),
     {exec, RowId, N};
+decode_resp(7, _Schema, Body) ->
+    {NCol, Rest} = decode(uint64, Body),
+    {Cols, Rest2} = decode_array(NCol, text, Rest),
+    {Rows, Marker, <<>>} = decode_row_tuples(NCol, Rest2),
+    {rows, Cols, Rows, Marker};
 decode_resp(8, _Schema, Body) ->
     {_, <<>>} = decode(uint64, Body),
     ack;
@@ -285,6 +316,101 @@ decode_resp(10, _Schema, Body) ->
     {Domain, Rest} = decode(uint64, Body),
     {Weight, <<>>} = decode(uint64, Rest),
     {metadata, Domain, Weight}.
+
+-spec decode_row_tuples(NCol, Bin) -> Ret when
+    NCol :: non_neg_integer(),
+    Bin :: binary(),
+    Ret :: {[row_tuple()], more | done, binary()}.
+decode_row_tuples(NCol, Bin) ->
+    decode_row_tuples(NCol, Bin, []).
+
+-spec decode_row_tuples(NCol, Bin, Acc) -> Ret when
+    NCol :: non_neg_integer(),
+    Bin :: binary(),
+    Acc :: [row_tuple()],
+    Ret :: {[row_tuple()], more | done, binary()}.
+decode_row_tuples(_NCol, <<16#eeeeeeeeeeeeeeee:64, Rest/binary>>, Acc) ->
+    {lists:reverse(Acc), more, Rest};
+decode_row_tuples(_NCol, <<16#ffffffffffffffff:64, Rest/binary>>, Acc) ->
+    {lists:reverse(Acc), done, Rest};
+decode_row_tuples(NCol, Bin, Acc) ->
+    {Row, Rest} = decode_row_tuple(NCol, Bin),
+    decode_row_tuples(NCol, Rest, [Row | Acc]).
+
+-spec decode_row_tuple(NCol, Bin) -> {row_tuple(), binary()} when
+    NCol :: non_neg_integer(),
+    Bin :: binary().
+decode_row_tuple(NCol, Bin) ->
+    {Types, Rest} = decode_row_tuple_types(NCol, Bin),
+    decode_row_tuple_values(Types, Rest).
+
+-spec decode_row_tuple_types(NCol, Bin) -> {[pos_integer()], binary()} when
+    NCol :: non_neg_integer(),
+    Bin :: binary().
+decode_row_tuple_types(NCol, Bin) ->
+    decode_row_tuple_types(NCol, Bin, []).
+
+-spec decode_row_tuple_types(NCol, Bin, Acc) -> {[pos_integer()], binary()} when
+    NCol :: non_neg_integer(),
+    Bin :: binary(),
+    Acc :: [pos_integer()].
+decode_row_tuple_types(0, Bin, Acc) ->
+    Consumed =
+        case length(Acc) of
+            L when L rem 2 =:= 0 ->
+                L;
+            L ->
+                L + 1
+        end,
+    PaddingLen = (16 - (Consumed rem 16)) * 4,
+    <<0:PaddingLen, Rest/binary>> = Bin,
+    {lists:reverse(Acc), Rest};
+decode_row_tuple_types(1, <<0:4, T:4, Rest/binary>>, Acc) ->
+    decode_row_tuple_types(0, Rest, [T | Acc]);
+decode_row_tuple_types(NCol, <<T1:4, T2:4, Rest/binary>>, Acc) when NCol > 1 ->
+    decode_row_tuple_types(NCol - 2, Rest, [T1, T2 | Acc]).
+
+-spec decode_row_tuple_values(Types, Bin) -> Ret when
+    Types :: [pos_integer()],
+    Bin :: binary(),
+    Ret :: {[sql_value()], binary()}.
+decode_row_tuple_values(Types, Bin) ->
+    decode_row_tuple_values(Types, Bin, []).
+
+-spec decode_row_tuple_values(Types, Bin, Acc) -> Ret when
+    Types :: [pos_integer()],
+    Bin :: binary(),
+    Acc :: [sql_value()],
+    Ret :: {[sql_value()], binary()}.
+decode_row_tuple_values([], Bin, Acc) ->
+    {lists:reverse(Acc), Bin};
+decode_row_tuple_values([T | Types], Bin, Acc) ->
+    {V, Rest} = decode_sql_value(T, Bin),
+    decode_row_tuple_values(Types, Rest, [V | Acc]).
+
+-spec decode_sql_value(pos_integer(), binary()) -> {sql_value(), binary()}.
+decode_sql_value(IType, Bin) ->
+    Type = integer_to_sql_type(IType),
+    {V, Rest} = decode(Type, Bin),
+    {{Type, V}, Rest}.
+
+-spec integer_to_sql_type(pos_integer()) -> sql_type().
+integer_to_sql_type(1) ->
+    int64;
+integer_to_sql_type(2) ->
+    float;
+integer_to_sql_type(3) ->
+    text;
+integer_to_sql_type(4) ->
+    blob;
+integer_to_sql_type(5) ->
+    null;
+integer_to_sql_type(9) ->
+    unixtime;
+integer_to_sql_type(10) ->
+    iso8601;
+integer_to_sql_type(11) ->
+    bool.
 
 decode_array(N, Type, Bin) ->
     decode_array(N, Type, Bin, []).
@@ -304,11 +430,12 @@ decode_array(N, Type, Bin, Acc) ->
     (blob, binary()) -> {binary(), binary()};
     (bool, binary()) -> {boolean(), binary()};
     (null, binary()) -> {null, binary()};
-    (date, binary()) -> {unicode:chardata(), binary()};
+    (unixtime, binary()) -> {int64(), binary()};
+    (iso8601, binary()) -> {unicode:chardata(), binary()};
     (node_role, binary()) -> {node_role(), binary()};
-    (node_info0, binary()) -> {#node_info0{}, binary()};
-    (node_info, binary()) -> {#node_info{}, binary()};
-    (file, binary()) -> {#file{}, binary()}.
+    (node_info0, binary()) -> {node_info0(), binary()};
+    (node_info, binary()) -> {node_info(), binary()};
+    (file, binary()) -> {file(), binary()}.
 decode(uint64, <<N:64/little, Rest/binary>>) ->
     {N, Rest};
 decode(int64, <<I:64/little, Rest/binary>>) ->
@@ -338,7 +465,9 @@ decode(bool, Bin) ->
 decode(null, Bin) ->
     {0, Rest} = decode(uint64, Bin),
     {null, Rest};
-decode(date, Bin) ->
+decode(unixtime, Bin) ->
+    decode(int64, Bin);
+decode(iso8601, Bin) ->
     decode(text, Bin);
 decode(node_role, Bin) ->
     case decode(uint64, Bin) of

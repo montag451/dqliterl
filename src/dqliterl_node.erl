@@ -106,7 +106,7 @@ new(Id, Addr, Dir, Opts) ->
 start(NodeRef) ->
     call(NodeRef, start).
 
--spec destroy(NodeRef :: node_ref()) -> ok.
+-spec destroy(NodeRef :: node_ref()) -> ok | {error, term()}.
 destroy(NodeRef) ->
     case is_supervised(NodeRef) of
         false ->
@@ -284,7 +284,7 @@ do_stop(State) ->
     State :: state(),
     StateTrans :: keep | fun((state(), send_command_ret()) -> state()),
     Ret :: {reply, Reply, state()} | {stop, Reason, {error, Reason}, state()},
-    Reply :: ok | {ok, term()} | command_failed(),
+    Reply :: ok | {ok, term()} | {error, command_failed()},
     Reason :: unexpected_port_msg().
 do_command_and_reply(CmdName, Args, State, StateTrans) ->
     {Res, State2} = do_command(CmdName, Args, State),

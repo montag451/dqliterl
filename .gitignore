@@ -9,7 +9,7 @@ _*
 *.swo
 .erlang.cookie
 ebin
-priv/bin
+/priv/bin/
 log
 erl_crash.dump
 .rebar

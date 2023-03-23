@@ -2,12 +2,14 @@
 _*
 .eunit
 *.o
+*.d
 *.beam
 *.plt
 *.swp
 *.swo
 .erlang.cookie
 ebin
+priv/bin
 log
 erl_crash.dump
 .rebar

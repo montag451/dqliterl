@@ -363,7 +363,7 @@ send_command(Port, CmdName, Args) when is_port(Port) ->
 
 -spec wait_for_port_msg(port(), term()) ->
     ok | {ok, term()} | unexpected_port_msg().
-wait_for_port_msg(Port, Expected) ->
+wait_for_port_msg(Port, Expected) when is_port(Port) ->
     receive
         {Port, Expected} ->
             ok;

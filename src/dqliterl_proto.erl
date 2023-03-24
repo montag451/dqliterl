@@ -357,27 +357,24 @@ decode_row_tuple(NCol, Bin) ->
     NCol :: non_neg_integer(),
     Bin :: binary().
 decode_row_tuple_types(NCol, Bin) ->
-    decode_row_tuple_types(NCol, Bin, []).
+    decode_row_tuple_types(NCol, Bin, 0, []).
 
--spec decode_row_tuple_types(NCol, Bin, Acc) -> {[pos_integer()], binary()} when
+-spec decode_row_tuple_types(NCol, Bin, Consumed, Acc) -> Ret when
     NCol :: non_neg_integer(),
     Bin :: binary(),
-    Acc :: [pos_integer()].
-decode_row_tuple_types(0, Bin, Acc) ->
-    Consumed =
-        case length(Acc) of
-            L when L rem 2 =:= 0 ->
-                L;
-            L ->
-                L + 1
-        end,
+    Consumed :: non_neg_integer(),
+    Acc :: [pos_integer()],
+    Ret :: {[pos_integer()], binary()}.
+decode_row_tuple_types(0, Bin, Consumed, Acc) ->
     PaddingLen = (16 - (Consumed rem 16)) * 4,
     <<0:PaddingLen, Rest/binary>> = Bin,
     {lists:reverse(Acc), Rest};
-decode_row_tuple_types(1, <<0:4, T:4, Rest/binary>>, Acc) ->
-    decode_row_tuple_types(0, Rest, [T | Acc]);
-decode_row_tuple_types(NCol, <<T1:4, T2:4, Rest/binary>>, Acc) when NCol > 1 ->
-    decode_row_tuple_types(NCol - 2, Rest, [T1, T2 | Acc]).
+decode_row_tuple_types(1, <<0:4, T:4, Rest/binary>>, Consumed, Acc) ->
+    decode_row_tuple_types(0, Rest, Consumed + 2, [T | Acc]);
+decode_row_tuple_types(NCol, <<T1:4, T2:4, Rest/binary>>, Consumed, Acc) when
+    NCol > 1
+->
+    decode_row_tuple_types(NCol - 2, Rest, Consumed + 2, [T1, T2 | Acc]).
 
 -spec decode_row_tuple_values(Types, Bin) -> Ret when
     Types :: [pos_integer()],

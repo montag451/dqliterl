@@ -73,7 +73,10 @@
     | {dump, unicode:chardata()}
     | cluster
     | {cluster, uint64()}
-    | {leadership, node_id()}.
+    | {leadership, node_id()}
+    | metadata
+    | {metadata, uint64()}
+    | {weight, uint64()}.
 -type error_code() :: uint64().
 -type error_message() :: unicode:chardata().
 -type resp_schema_type() :: uint8().
@@ -130,7 +133,13 @@ encode_req(cluster) ->
 encode_req({cluster, Format}) ->
     add_header(16, encode({uint64, Format}));
 encode_req({leadership, NodeId}) ->
-    add_header(17, encode({uint64, NodeId})).
+    add_header(17, encode({uint64, NodeId}));
+encode_req(metadata) ->
+    encode_req({metadata, 0});
+encode_req({metadata, Format}) ->
+    add_header(18, encode({uint64, Format}));
+encode_req({weight, Weight}) ->
+    add_header(19, encode({uint64, Weight})).
 
 -spec add_header(req_schema_type(), iodata()) -> iodata().
 add_header(Type, Body) ->

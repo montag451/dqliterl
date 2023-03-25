@@ -18,6 +18,11 @@
     sql_value/0
 ]).
 
+-type uint8() :: 0..255.
+-type uint64() :: 0..18446744073709551615.
+-type int64() :: -9223372036854775808..9223372036854775807.
+-type uint32() :: 0..4294967295.
+
 -type node_id() :: uint64().
 -type node_role() :: voter | standby | spare.
 -type node_info0() :: #node_info0{}.
@@ -43,17 +48,13 @@
     | {iso8601, unicode:chardata()}
     | {bool, boolean()}.
 
--type uint8() :: 0..255.
--type uint64() :: 0..18446744073709551615.
--type int64() :: -9223372036854775808..9223372036854775807.
--type uint32() :: 0..4294967295.
-
--type schema_version() :: uint8().
 -type client_id() :: uint64().
 -type database_id() :: uint32().
 -type stmt_id() :: uint32().
 -type failure_domain() :: uint64().
 -type weight() :: uint64().
+
+-type schema_version() :: uint8().
 -type param_tuple() :: [sql_value()].
 -type req_schema_type() :: uint8().
 -type req() ::
@@ -77,6 +78,7 @@
     | metadata
     | {metadata, uint64()}
     | {weight, uint64()}.
+
 -type error_code() :: uint64().
 -type error_message() :: unicode:chardata().
 -type resp_schema_type() :: uint8().

@@ -400,7 +400,12 @@ decode_row_tuple_values([T | Types], Bin, Acc) ->
 decode_sql_value(IType, Bin) ->
     Type = integer_to_sql_type(IType),
     {V, Rest} = decode(Type, Bin),
-    {{Type, V}, Rest}.
+    case V of
+        null ->
+            {V, Rest};
+        _ ->
+            {{Type, V}, Rest}
+    end.
 
 -spec integer_to_sql_type(pos_integer()) -> sql_type().
 integer_to_sql_type(1) ->

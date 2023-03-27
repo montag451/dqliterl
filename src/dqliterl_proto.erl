@@ -393,12 +393,11 @@ decode_row_tuple_values(Types, Bin) ->
 decode_row_tuple_values([], Bin, Acc) ->
     {lists:reverse(Acc), Bin};
 decode_row_tuple_values([T | Types], Bin, Acc) ->
-    {V, Rest} = decode_sql_value(T, Bin),
+    {V, Rest} = decode_sql_value(integer_to_sql_type(T), Bin),
     decode_row_tuple_values(Types, Rest, [V | Acc]).
 
--spec decode_sql_value(pos_integer(), binary()) -> {sql_value(), binary()}.
-decode_sql_value(IType, Bin) ->
-    Type = integer_to_sql_type(IType),
+-spec decode_sql_value(sql_type(), binary()) -> {sql_value(), binary()}.
+decode_sql_value(Type, Bin) ->
     {V, Rest} = decode(Type, Bin),
     case V of
         null ->
